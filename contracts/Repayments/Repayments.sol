@@ -13,10 +13,10 @@ contract Repayments is RepaymentStorage,IRepayment {
     using SafeMath for uint256;
 
 
-    event votingPassed(uint256 nextDuePeriod,uint256 PeriodWhenExtensionIsPassed);
-    event votingFailed(uint256 nextDuePeriod);
-    event lenderVoted(address lender,uint256 totalExtensionSupport,uint256 lastVoteTime);
-    event extensionRequested(uint256 extensionVoteEndTime);
+    event votingPassed(uint256 nextDuePeriod,uint256 PeriodWhenExtensionIsPassed,address pool);
+    event votingFailed(uint256 nextDuePeriod,address pool);
+    event lenderVoted(address lender,uint256 totalExtensionSupport,uint256 lastVoteTime,address pool);
+    event extensionRequested(uint256 extensionVoteEndTime,address pool);
 
     modifier isPoolInitialized() {
         require(
@@ -124,7 +124,7 @@ contract Repayments is RepaymentStorage,IRepayment {
             "Repayments::requestExtension - Extension requested already"
         );
         _extensionVoteEndTime = (block.timestamp).add(repaymentDetails[msg.sender].votingExtensionlength);
-        emit extensionRequested(_extensionVoteEndTime);
+        emit extensionRequested(_extensionVoteEndTime,msg.sender);
         return _extensionVoteEndTime;
     }
 
@@ -145,7 +145,7 @@ contract Repayments is RepaymentStorage,IRepayment {
         );
         _lastVoteTime = block.timestamp;
         _totalExtensionSupport = _totalExtensionSupport.add(_balance);
-        emit lenderVoted(_lender,_totalExtensionSupport,_lastVoteTime);
+        emit lenderVoted(_lender,_totalExtensionSupport,_lastVoteTime,msg.sender);
         return (_lastVoteTime, _totalExtensionSupport);
 
     }
@@ -166,11 +166,11 @@ contract Repayments is RepaymentStorage,IRepayment {
         if (((_totalExtensionSupport).mul(repaymentDetails[msg.sender].votingPassRatio)).div(100) >= _totalSupply) {
             _PeriodWhenExtensionIsPassed = calculateCurrentPeriod(_loanStartTime,_repaymentInterval);
             _nextDuePeriod = _nextDuePeriod.add(1);
-            emit votingPassed(_nextDuePeriod,_PeriodWhenExtensionIsPassed);
+            emit votingPassed(_nextDuePeriod,_PeriodWhenExtensionIsPassed,msg.sender);
 
         }
         else{
-            emit votingFailed(_nextDuePeriod);
+            emit votingFailed(_nextDuePeriod,msg.sender);
         }
         return (_PeriodWhenExtensionIsPassed,_nextDuePeriod);
         
