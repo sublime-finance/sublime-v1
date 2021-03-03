@@ -51,7 +51,7 @@ contract Pool is ERC20PresetMinterPauserUpgradeable,IPool {
     uint256 public repaymentInterval;
     address public collateralAsset;
     
-    uint256 PeriodWhenExtensionIsRequested;
+    uint256 public PeriodWhenExtensionIsPassed;   // will be set to noOfRepaymentIntervals+1 
     uint256 public baseLiquidityShares;
     uint256 public extraLiquidityShares;
     uint256 public liquiditySharesTokenAddress;
@@ -317,20 +317,26 @@ contract Pool is ERC20PresetMinterPauserUpgradeable,IPool {
     }
 
 
-    function resultOfVoting() external {
-        
+    function resultOfVoting() external isPoolActive{
+
+        (PeriodWhenExtensionIsPassed,nextDuePeriod) = IRepayment(Repayment).resultOfVoting(totalExtensionSupport, extensionVoteEndTime, totalSupply(),nextDuePeriod,repaymentInterval,loanStartTime,PeriodWhenExtensionIsPassed);
     }
 
     function requestExtension() external OnlyBorrower isPoolActive
     {
+        require(PeriodWhenExtensionIsPassed > noOfRepaymentIntervals,"Pool::requestExtension: you have already been given an extension,No more extension");
+        extensionVoteEndTime = IRepayment(Repayment).requestExtension(extensionVoteEndTime);
+        totalExtensionSupport = 0;
         
     }
-
 
     function voteOnExtension() external isPoolActive 
     {
-        
+        require(balanceOf(msg.sender)!=0 , "Pool::voteOnExtension - insufficient balance for vote");
+        (lenders[msg.sender].lastVoteTime,totalExtensionSupport) = IRepayment(Repayment).voteOnExtension(msg.sender,lenders[msg.sender].lastVoteTime,extensionVoteEndTime, balanceOf(msg.sender),totalExtensionSupport);
+
     }
+
 
     function requestCollateralCall()
         public
