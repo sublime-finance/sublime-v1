@@ -84,6 +84,11 @@ contract Pool is ERC20PresetMinterPauserUpgradeable,IPool {
     event lenderVoted(address Lender);
     event LoanDefaulted();
 
+    event votingPassed(uint256 nextDuePeriod,uint256 periodWhenExtensionIsPassed);
+    event votingFailed(uint256 nextDuePeriod);
+    event lenderVoted(address lender,uint256 totalExtensionSupport,uint256 lastVoteTime);
+    event extensionRequested(uint256 extensionVoteEndTime);
+
     modifier OnlyBorrower {
         require(msg.sender == borrower, "Pool::OnlyBorrower - Only borrower can invoke");
         _;
@@ -345,26 +350,57 @@ contract Pool is ERC20PresetMinterPauserUpgradeable,IPool {
         
     }
 
-
-    function resultOfVoting() external isPoolActive{
-
-        (periodWhenExtensionIsPassed,nextDuePeriod) = IRepayment(Repayment).resultOfVoting(totalExtensionSupport, extensionVoteEndTime, totalSupply(),nextDuePeriod,repaymentInterval,loanStartTime,periodWhenExtensionIsPassed);
+    function requestExtension()
+        external override 
+    {
+        uint256 _extensionVoteEndTime = extensionVoteEndTime;
+        uint256 _votingExtensionlength = IPoolFactory(PoolFactory).votingExtensionlength();
+        require(
+            block.timestamp > _extensionVoteEndTime,
+            "Pool::requestExtension - Extension requested already"
+        );
+        _extensionVoteEndTime = (block.timestamp).add(_votingExtensionlength);
+        emit extensionRequested(_extensionVoteEndTime);
+        extensionVoteEndTime = _extensionVoteEndTime;
     }
 
-    function requestExtension() external OnlyBorrower isPoolActive
-    {
-        require(periodWhenExtensionIsPassed > noOfRepaymentIntervals,"Pool::requestExtension: you have already been given an extension,No more extension");
-        extensionVoteEndTime = IRepayment(Repayment).requestExtension(extensionVoteEndTime);
-        totalExtensionSupport = 0;
+    function voteOnExtension() external override {
         
+        uint256 _extensionVoteEndTime = extensionVoteEndTime;
+        uint256 _votingExtensionlength = IPoolFactory(PoolFactory).votingExtensionlength();
+        require(
+            block.timestamp < _extensionVoteEndTime,
+            "Pool::voteOnExtension - Voting is over"
+        );
+        uint256 _lastVoteTime = lenders[msg.sender].lastVoteTime;
+        require(
+            _lastVoteTime < _extensionVoteEndTime.sub(_votingExtensionlength),
+            "Pool::voteOnExtension - you have already voted"
+        );
+        _lastVoteTime = block.timestamp;
+        totalExtensionSupport = totalExtensionSupport.add(balanceOf(msg.sender));
+        emit lenderVoted(msg.sender,totalExtensionSupport,_lastVoteTime);
+        lenders[msg.sender].lastVoteTime = _lastVoteTime;
     }
 
-    function voteOnExtension() external isPoolActive 
-    {
-        require(balanceOf(msg.sender)!=0 , "Pool::voteOnExtension - insufficient balance for vote");
-        (lenders[msg.sender].lastVoteTime,totalExtensionSupport) = IRepayment(Repayment).voteOnExtension(msg.sender,lenders[msg.sender].lastVoteTime,extensionVoteEndTime, balanceOf(msg.sender),totalExtensionSupport);
 
+    function resultOfVoting() external override {
+
+
+        require(block.timestamp > extensionVoteEndTime, "Pool::resultOfVoting - Voting is not over");
+        uint256 _votingPassRatio = IPoolFactory(PoolFactory).votingPassRatio();
+        if (((totalExtensionSupport)) >= (totalSupply().mul(_votingPassRatio)).div(100000000)) {
+            periodWhenExtensionIsPassed = calculateCurrentPeriod(loanStartTime,repaymentInterval);
+            nextDuePeriod = nextDuePeriod.add(1);
+            emit votingPassed(nextDuePeriod,periodWhenExtensionIsPassed);
+        }
+        else{
+            emit votingFailed(nextDuePeriod);
+        }
     }
+
+
+
 
 
     function requestCollateralCall()

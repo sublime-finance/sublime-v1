@@ -13,10 +13,7 @@ contract Repayments is RepaymentStorage,IRepayment {
     using SafeMath for uint256;
 
 
-    event votingPassed(uint256 nextDuePeriod,uint256 PeriodWhenExtensionIsPassed,address pool);
-    event votingFailed(uint256 nextDuePeriod,address pool);
-    event lenderVoted(address lender,uint256 totalExtensionSupport,uint256 lastVoteTime,address pool);
-    event extensionRequested(uint256 extensionVoteEndTime,address pool);
+
 
     modifier isPoolInitialized() {
         require(
@@ -115,76 +112,5 @@ contract Repayments is RepaymentStorage,IRepayment {
 
 
 
-    function requestExtension(uint256 _extensionVoteEndTime)
-        external override isPoolInitialized
-        returns (uint256)
-    {
-        require(
-            block.timestamp > _extensionVoteEndTime,
-            "Repayments::requestExtension - Extension requested already"
-        );
-        _extensionVoteEndTime = (block.timestamp).add(repaymentDetails[msg.sender].votingExtensionlength);
-        emit extensionRequested(_extensionVoteEndTime,msg.sender);
-        return _extensionVoteEndTime;
-    }
-
-    function voteOnExtension(
-        address _lender,
-        uint256 _lastVoteTime,
-        uint256 _extensionVoteEndTime,
-        uint256 _balance,
-        uint256 _totalExtensionSupport
-    ) external override isPoolInitialized returns (uint256, uint256) {
-        require(
-            block.timestamp < _extensionVoteEndTime,
-            "Repayments::voteOnExtension - Voting is over"
-        );
-        require(
-            _lastVoteTime < _extensionVoteEndTime.sub(repaymentDetails[msg.sender].votingExtensionlength),
-            "Repayments::voteOnExtension - you have already voted"
-        );
-        _lastVoteTime = block.timestamp;
-        _totalExtensionSupport = _totalExtensionSupport.add(_balance);
-        emit lenderVoted(_lender,_totalExtensionSupport,_lastVoteTime,msg.sender);
-        return (_lastVoteTime, _totalExtensionSupport);
-
-    }
-
-    function resultOfVoting(
-        uint256 _totalExtensionSupport,
-        uint256 _extensionVoteEndTime,
-        uint256 _totalSupply,
-        uint256 _nextDuePeriod,
-        uint256 _repaymentInterval,
-        uint256 _loanStartTime,
-        uint256 _PeriodWhenExtensionIsPassed
-    ) external override isPoolInitialized returns (uint256,uint256) {
-
-        require(block.timestamp > _extensionVoteEndTime, "Repayments::resultOfVoting - Voting is not over");
-
-        // Assuming votingPassRatio a uint in range of 1-100 (can be changed to 10^18 or some large value)
-        if (((_totalExtensionSupport).mul(repaymentDetails[msg.sender].votingPassRatio)).div(100) >= _totalSupply) {
-            _PeriodWhenExtensionIsPassed = calculateCurrentPeriod(_loanStartTime,_repaymentInterval);
-            _nextDuePeriod = _nextDuePeriod.add(1);
-            emit votingPassed(_nextDuePeriod,_PeriodWhenExtensionIsPassed,msg.sender);
-
-        }
-        else{
-            emit votingFailed(_nextDuePeriod,msg.sender);
-        }
-        return (_PeriodWhenExtensionIsPassed,_nextDuePeriod);
-        
-    }
-
-    function updatePoolFactory(address _poolFactory) external onlyOwner {
-        poolFactory = IPoolFactory(_poolFactory);
-    }
-
-    function updateVotingExtensionlength(uint256 _votingExtensionPeriod) external onlyOwner {
-        votingExtensionlength = _votingExtensionPeriod;
-    }
-
-    function updateVotingPassRatio(uint256 _votingPassRatio) external onlyOwner {
-        votingPassRatio = _votingPassRatio;
-    }
+    
 }
