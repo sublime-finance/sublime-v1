@@ -14,7 +14,6 @@ contract Repayments is RepaymentStorage,IRepayment {
 
 
 
-
     modifier isPoolInitialized() {
         require(
              repaymentDetails[msg.sender].numberOfTotalRepayments !=0,

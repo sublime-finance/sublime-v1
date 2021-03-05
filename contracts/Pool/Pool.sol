@@ -51,7 +51,7 @@ contract Pool is ERC20PresetMinterPauserUpgradeable,IPool {
     uint256 public repaymentInterval;
     address public collateralAsset;
     
-    uint256 public periodWhenExtensionIsPassed;   // will be set to noOfRepaymentIntervals+1 
+    uint256 public PeriodWhenExtensionIsPassed;   // will be set to noOfRepaymentIntervals+1 
     uint256 public baseLiquidityShares;
     uint256 public extraLiquidityShares;
     uint256 public liquiditySharesTokenAddress;
