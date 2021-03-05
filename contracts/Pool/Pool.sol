@@ -358,7 +358,7 @@ contract Pool is ERC20PresetMinterPauserUpgradeable,IPool {
             block.timestamp > _extensionVoteEndTime,
             "Pool::requestExtension - Extension requested already"
         );
-        _extensionVoteEndTime = ((calculateCurrentPeriod().add(1)).mul(repaymentInterval)).add((repaymentInterval.mul());
+        _extensionVoteEndTime = ((calculateCurrentPeriod().add(1)).mul(repaymentInterval)).add(repaymentInterval);
         emit extensionRequested(_extensionVoteEndTime);
         extensionVoteEndTime = _extensionVoteEndTime;
     }
