@@ -28,7 +28,7 @@ contract Repayments is RepaymentStorage,IRepayment {
     }
 
     function initialize(address _poolFactory, uint256 _votingExtensionlength, uint256 _votingPassRatio)
-        public
+        public 
         initializer 
     {
         // _votingExtensionlength - should enforce conditions with repaymentInterval
@@ -41,7 +41,7 @@ contract Repayments is RepaymentStorage,IRepayment {
     function initializeRepayment(
         uint256 numberOfTotalRepayments,
         uint256 repaymentInterval
-    ) external onlyValidPool {
+    ) external override onlyValidPool {
         repaymentDetails[msg.sender].gracePenaltyRate = gracePenaltyRate;
         repaymentDetails[msg.sender].gracePeriodFraction = gracePeriodFraction;
         repaymentDetails[msg.sender].numberOfTotalRepayments = numberOfTotalRepayments;

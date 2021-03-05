@@ -51,7 +51,7 @@ contract Pool is ERC20PresetMinterPauserUpgradeable,IPool {
     uint256 public repaymentInterval;
     address public collateralAsset;
     
-    uint256 public PeriodWhenExtensionIsPassed;   // will be set to noOfRepaymentIntervals+1 
+    uint256 public periodWhenExtensionIsPassed;   // will be set to noOfRepaymentIntervals+1 
     uint256 public baseLiquidityShares;
     uint256 public extraLiquidityShares;
     uint256 public liquiditySharesTokenAddress;
@@ -351,20 +351,19 @@ contract Pool is ERC20PresetMinterPauserUpgradeable,IPool {
     }
 
     function requestExtension()
-        external override 
+        external isPoolActive OnlyBorrower
     {
         uint256 _extensionVoteEndTime = extensionVoteEndTime;
-        uint256 _votingExtensionlength = IPoolFactory(PoolFactory).votingExtensionlength();
         require(
             block.timestamp > _extensionVoteEndTime,
             "Pool::requestExtension - Extension requested already"
         );
-        _extensionVoteEndTime = (block.timestamp).add(_votingExtensionlength);
+        _extensionVoteEndTime = ((calculateCurrentPeriod().add(1)).mul(repaymentInterval)).add((repaymentInterval.mul());
         emit extensionRequested(_extensionVoteEndTime);
         extensionVoteEndTime = _extensionVoteEndTime;
     }
 
-    function voteOnExtension() external override {
+    function voteOnExtension() external isPoolActive{
         
         uint256 _extensionVoteEndTime = extensionVoteEndTime;
         uint256 _votingExtensionlength = IPoolFactory(PoolFactory).votingExtensionlength();
@@ -372,6 +371,7 @@ contract Pool is ERC20PresetMinterPauserUpgradeable,IPool {
             block.timestamp < _extensionVoteEndTime,
             "Pool::voteOnExtension - Voting is over"
         );
+        require(balanceOf(msg.sender)!=0,"Pool::voteOnExtension - Not a valid lender for pool");
         uint256 _lastVoteTime = lenders[msg.sender].lastVoteTime;
         require(
             _lastVoteTime < _extensionVoteEndTime.sub(_votingExtensionlength),
@@ -379,25 +379,31 @@ contract Pool is ERC20PresetMinterPauserUpgradeable,IPool {
         );
         _lastVoteTime = block.timestamp;
         totalExtensionSupport = totalExtensionSupport.add(balanceOf(msg.sender));
+        uint256 _votingPassRatio = IPoolFactory(PoolFactory).votingPassRatio();
         emit lenderVoted(msg.sender,totalExtensionSupport,_lastVoteTime);
         lenders[msg.sender].lastVoteTime = _lastVoteTime;
-    }
-
-
-    function resultOfVoting() external override {
-
-
-        require(block.timestamp > extensionVoteEndTime, "Pool::resultOfVoting - Voting is not over");
-        uint256 _votingPassRatio = IPoolFactory(PoolFactory).votingPassRatio();
         if (((totalExtensionSupport)) >= (totalSupply().mul(_votingPassRatio)).div(100000000)) {
-            periodWhenExtensionIsPassed = calculateCurrentPeriod(loanStartTime,repaymentInterval);
+            periodWhenExtensionIsPassed = calculateCurrentPeriod();
             nextDuePeriod = nextDuePeriod.add(1);
             emit votingPassed(nextDuePeriod,periodWhenExtensionIsPassed);
         }
-        else{
-            emit votingFailed(nextDuePeriod);
-        }
+        
     }
+
+
+    // function resultOfVoting() external isPoolActive{
+
+    //     require(block.timestamp > extensionVoteEndTime, "Pool::resultOfVoting - Voting is not over");
+    //     uint256 _votingPassRatio = IPoolFactory(PoolFactory).votingPassRatio();
+    //     if (((totalExtensionSupport)) >= (totalSupply().mul(_votingPassRatio)).div(100000000)) {
+    //         periodWhenExtensionIsPassed = calculateCurrentPeriod();
+    //         nextDuePeriod = nextDuePeriod.add(1);
+    //         emit votingPassed(nextDuePeriod,periodWhenExtensionIsPassed);
+    //     }
+    //     else{
+    //         emit votingFailed(nextDuePeriod);
+    //     }
+    // }
 
 
 
@@ -440,7 +446,7 @@ contract Pool is ERC20PresetMinterPauserUpgradeable,IPool {
                     borrowRate,
                     _loanStartedAt,
                     nextDuePeriod,
-                    periodWhenExtensionIsRequested
+                    periodWhenExtensionIsPassed
                 )
             );
         uint256 _extraInterest =

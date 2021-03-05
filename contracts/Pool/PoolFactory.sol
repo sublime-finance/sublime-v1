@@ -30,6 +30,8 @@ contract PoolFactory is Initializable, OwnableUpgradeable, IPoolFactory {
     uint256 public override collateralVolatilityThreshold;
     uint256 public override gracePeriodPenaltyFraction;
     uint256 public override liquidatorRewardFraction;
+    uint256 public override votingPassRatio;
+    uint256 public override votingExtensionlength;
 
     mapping(address => bool) isBorrowToken;
     mapping(address => bool) isCollateralToken;

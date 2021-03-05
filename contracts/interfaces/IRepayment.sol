@@ -11,8 +11,6 @@ interface IRepayment {
     ) external ;
 
 
-   
-
     function calculateRepayAmount(
         uint256 activeBorrowAmount,
         uint256 repaymentInterval,
@@ -33,27 +31,5 @@ interface IRepayment {
     ) external returns (uint256, uint256);
 
 
-    function requestExtension(uint256 extensionVoteEndTime)
-        external 
-        returns (uint256);
-
-    function voteOnExtension(
-        address lender,
-        uint256 lastVoteTime,
-        uint256 extensionVoteEndTime,
-        uint256 balance,
-        uint256 totalExtensionSupport
-    ) external returns (uint256, uint256);
-
-    
-    function resultOfVoting(
-        uint256 totalExtensionSupport,
-        uint256 extensionVoteEndTime,
-        uint256 totalSupply,
-        uint256 nextDuePeriod,
-        uint256 repaymentInterval,
-        uint256 loanStartTime,
-        uint256 PeriodWhenExtensionIsPassed
-    ) external returns (uint256,uint256);
 
 }
