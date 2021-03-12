@@ -229,7 +229,7 @@ contract SavingsAccount is ISavingsAccount, Initializable, OwnableUpgradeable {
         address asset,
         address strategy,
         bool withdrawShares
-    ) external override returns (uint256) {
+    ) external override returns (uint256 amountReceived) {
         require(
             amount != 0,
             "SavingsAccount::withdraw Amount must be greater than zero"
@@ -240,13 +240,67 @@ contract SavingsAccount is ISavingsAccount, Initializable, OwnableUpgradeable {
         ][asset][strategy]
             .sub(amount, "SavingsAccount::withdraw Insufficient amount");
 
-        uint256 amountReceived = amount;
+        address token;
+        (token, amountReceived) = _withdraw(
+            withdrawTo,
+            amount,
+            asset,
+            strategy,
+            withdrawShares
+        );
 
+        emit Withdrawn(msg.sender, withdrawTo, amountReceived, token, strategy);
+    }
+
+    function withdrawFrom(
+        address from,
+        uint256 amount,
+        address asset,
+        address strategy,
+        bool withdrawShares
+    ) external override returns (uint256 amountReceived) {
+        require(
+            amount != 0,
+            "SavingsAccount::withdrawFrom Amount must be greater than zero"
+        );
+
+        allowance[from][asset][msg.sender] = allowance[from][asset][msg.sender]
+            .sub(
+            amount,
+            "SavingsAccount::withdrawFrom allowance limit exceeding"
+        );
+
+        //reduce sender's balance
+        userLockedBalance[from][asset][strategy] = userLockedBalance[from][
+            asset
+        ][strategy]
+            .sub(amount, "SavingsAccount::withdrawFrom insufficient balance");
+
+        address token;
+        (token, amountReceived) = _withdraw(
+            msg.sender,
+            amount,
+            asset,
+            strategy,
+            withdrawShares
+        );
+
+        emit Withdrawn(from, msg.sender, amountReceived, token, strategy);
+    }
+
+    function _withdraw(
+        address payable withdrawTo,
+        uint256 amount,
+        address asset,
+        address strategy,
+        bool withdrawShares
+    ) internal returns (address token, uint256 amountReceived) {
+        amountReceived = amount;
         if (!withdrawShares || strategy != address(0)) {
             amountReceived = IYield(strategy).unlockTokens(asset, amount);
         }
 
-        address token = asset;
+        token = asset;
         if (withdrawShares) token = IYield(strategy).liquidityToken(asset);
 
         if (token == address(0)) {
@@ -254,8 +308,6 @@ contract SavingsAccount is ISavingsAccount, Initializable, OwnableUpgradeable {
         } else {
             IERC20(token).safeTransfer(withdrawTo, amountReceived);
         }
-
-        emit Withdrawn(msg.sender, amountReceived, token, strategy);
     }
 
     function withdrawAll(address _asset)

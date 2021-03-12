@@ -16,7 +16,8 @@ interface ISavingsAccount {
         address newStrategy
     );
     event Withdrawn(
-        address user,
+        address from,
+        address to,
         uint256 amountReceived,
         address token,
         address strategy
@@ -37,7 +38,6 @@ interface ISavingsAccount {
         address strategy
     ) external payable returns (uint256 sharesReceived);
 
-    
     function depositTo(
         uint256 amount,
         address asset,
@@ -74,6 +74,14 @@ interface ISavingsAccount {
         address strategy,
         bool withdrawShares
     ) external returns (uint256);
+
+    function withdrawFrom(
+        address from,
+        uint256 amount,
+        address asset,
+        address strategy,
+        bool withdrawShares
+    ) external returns (uint256 amountReceived);
 
     function withdrawAll(address _asset)
         external
