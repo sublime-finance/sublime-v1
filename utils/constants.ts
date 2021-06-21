@@ -54,6 +54,7 @@ export const testPoolFactoryParams = {
   _liquidatorRewardFraction: BigNumber.from(15),
   _poolInitFuncSelector: "0x272edaf2",
   _poolTokenInitFuncSelector: "0x077f224a",
+  _poolCancelPenalityFraction: BigNumber.from(10000000)
 };
 
 // Pool Factory inputs tro be manually added
@@ -66,6 +67,10 @@ export const testPoolFactoryParams = {
 // address _collateralAsset,
 // address _poolSavingsStrategy,
 // bool _transferFromSavingsAccount,
+
+export const OperationalAmounts = {
+  _amountLent: BigNumber.from(1000000),
+};
 
 export const ChainLinkAggregators = {
   "LINK/USD": "0x2c1d072e956AFFC0D435Cb7AC38EF18d24d9127c",

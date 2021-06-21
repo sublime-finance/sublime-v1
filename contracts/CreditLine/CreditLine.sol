@@ -78,8 +78,10 @@ contract CreditLine is CreditLineStorage, ReentrancyGuard {
     event PartialCreditLineRepaid(bytes32 creditLineHash, uint256 repayAmount);
     event CreditLineClosed(bytes32 creditLineHash);
 
-    function initialize(address _defaultStrategy) public initializer {
+    function initialize(address _defaultStrategy, address _poolFactory, address _strategyRegistry) public initializer {
         __Ownable_init();
+        PoolFactory = _poolFactory;
+        strategyRegistry = _strategyRegistry;
         defaultStrategy = _defaultStrategy;
     }
 

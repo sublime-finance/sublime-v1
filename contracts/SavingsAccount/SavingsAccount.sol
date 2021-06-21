@@ -9,6 +9,8 @@ import "../interfaces/ISavingsAccount.sol";
 import "../interfaces/IStrategyRegistry.sol";
 import "../interfaces/IYield.sol";
 
+import "hardhat/console.sol";
+
 /**
  * @title Savings account contract with Methods related to savings account
  * @notice Implements the functions related to savings account
@@ -300,10 +302,6 @@ contract SavingsAccount is ISavingsAccount, Initializable, OwnableUpgradeable {
         bool withdrawShares
     ) internal returns (address token, uint256 amountReceived) {
         if (strategy == address(0)) {
-            require(
-                !withdrawShares,
-                "Cannot withdraw shared when No strategy is used"
-            );
             amountReceived = amount;
             _transfer(asset, withdrawTo, amountReceived);
             token = asset;
@@ -434,7 +432,6 @@ contract SavingsAccount is ISavingsAccount, Initializable, OwnableUpgradeable {
         uint256 amount
     ) external override returns (uint256) {
         require(amount != 0, "SavingsAccount::transferFrom zero amount");
-
         //update allowance
         allowance[from][token][msg.sender] = allowance[from][token][msg.sender]
             .sub(

@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.7.0;
 
-import "hardhat/console.sol";
-
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -15,6 +13,8 @@ import "../interfaces/ISavingsAccount.sol";
 import "../interfaces/IPool.sol";
 import "../interfaces/IExtension.sol";
 import "../interfaces/IPoolToken.sol";
+
+import "hardhat/console.sol";
 
 contract Pool is Initializable, IPool, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -256,6 +256,7 @@ contract Pool is Initializable, IPool, ReentrancyGuard {
 
     function _directDeposit(
         ISavingsAccount _savingsAccount,
+        address _from,
         address _to,
         uint256 _amount,
         address _asset,
@@ -263,20 +264,21 @@ contract Pool is Initializable, IPool, ReentrancyGuard {
         address _strategy
     ) internal returns(uint256) {
         if(_toSavingsAccount) {
-            return _directSavingsAccountDeposit(_savingsAccount, _to, _amount, _asset, _strategy);
+            return _directSavingsAccountDeposit(_savingsAccount, _from, _to, _amount, _asset, _strategy);
         } else {
-            return _pullTokens(_to, _amount, _asset);
+            return _pullTokens(_asset, _amount, _from, _to);
         }
     }
 
     function _directSavingsAccountDeposit(
         ISavingsAccount _savingsAccount,
+        address _from,
         address _to,
         uint256 _amount,
         address _asset,
         address _strategy
     ) internal returns(uint256 _sharesReceived) {
-        _pullTokens(_asset, _amount, _to);
+        _pullTokens(_asset, _amount, _from, _to);
         uint256 _ethValue;
         if(_asset == address(0)) {
             _ethValue = _amount;   
@@ -347,7 +349,7 @@ contract Pool is Initializable, IPool, ReentrancyGuard {
         }
     }
 
-    function _pullTokens(address _asset, uint256 _amount, address _to) internal returns(uint256){
+    function _pullTokens(address _asset, uint256 _amount, address _from, address _to) internal returns(uint256){
         if(_asset == address(0)) {
             require(msg.value >= _amount, "");
             if(_to != address(this)) {
@@ -360,7 +362,7 @@ contract Pool is Initializable, IPool, ReentrancyGuard {
         }
 
         IERC20(_asset).transferFrom(
-            msg.sender,
+            _from,
             _to,
             _amount
         );
@@ -390,6 +392,7 @@ contract Pool is Initializable, IPool, ReentrancyGuard {
         } else {
             _sharesReceived = _directDeposit(
                 ISavingsAccount(IPoolFactory(PoolFactory).savingsAccount()),
+                _depositFrom,
                 _depositTo,
                 _amount,
                 _asset,
@@ -486,9 +489,14 @@ contract Pool is Initializable, IPool, ReentrancyGuard {
         IExtension(_poolFactory.extension()).initializePoolExtension(
             _repaymentInterval
         );
-        IERC20(poolConstants.borrowAsset).transfer(
-            poolConstants.borrower,
-            _tokensLent
+        _withdrawFromSavingsAccount(
+            ISavingsAccount(IPoolFactory(PoolFactory).savingsAccount()), 
+            address(this), 
+            msg.sender, 
+            _tokensLent, 
+            poolConstants.borrowAsset, 
+            address(0), 
+            false
         );
 
         delete poolConstants.loanWithdrawalDeadline;
@@ -543,10 +551,10 @@ contract Pool is Initializable, IPool, ReentrancyGuard {
         address _borrowToken = poolConstants.borrowAsset;
         _deposit(
             _fromSavingsAccount,
-            false,
+            true,
             _borrowToken,
             _amount,
-            address(0),
+            poolConstants.poolSavingsStrategy,
             msg.sender,
             address(this)
         );
@@ -667,7 +675,7 @@ contract Pool is Initializable, IPool, ReentrancyGuard {
         uint256 _principleToPayback = poolToken.totalSupply();
         address _borrowAsset = poolConstants.borrowAsset;
         
-        _pullTokens(_borrowAsset, _principleToPayback, address(this));
+        _pullTokens(_borrowAsset, _principleToPayback, msg.sender, address(this));
 
         poolVars.loanStatus = LoanStatus.CLOSED;
 
@@ -695,7 +703,6 @@ contract Pool is Initializable, IPool, ReentrancyGuard {
 
         //gets amount through liquidity shares
         uint256 _balance = poolToken.balanceOf(msg.sender);
-        poolToken.burn(msg.sender, _balance);
 
         if (_loanStatus == LoanStatus.DEFAULTED) {
             uint256 _totalAsset;
@@ -726,6 +733,7 @@ contract Pool is Initializable, IPool, ReentrancyGuard {
         _withdrawRepayment(msg.sender, true);
         //to add transfer if not included in above (can be transferred with liquidity)
 
+        poolToken.burn(msg.sender, _balance);
         //transfer liquidity provided
         _tokenTransfer(poolConstants.borrowAsset, msg.sender, _balance);
 
