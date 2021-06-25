@@ -233,6 +233,11 @@ contract AaveYield is IYield, Initializable, OwnableUpgradeable {
         returns (uint256 amount)
     {
         if (shares == 0) return 0;
+        if(asset == address(0)) {
+            // TODO: To be upgraded to v2 and restructured
+            asset = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+        }
+
         address aToken = liquidityToken(asset);
 
         (, , , , , , , uint256 liquidityIndex, , ) =
@@ -251,7 +256,9 @@ contract AaveYield is IYield, Initializable, OwnableUpgradeable {
         override
         returns (uint256 shares)
     {
+
         shares = (amount.mul(1e18)).div(getTokensForShares(1e18, asset));
+        
     }
 
     function _depositETH(uint256 amount)
@@ -279,10 +286,11 @@ contract AaveYield is IYield, Initializable, OwnableUpgradeable {
     {
         aToken = liquidityToken(asset);
         uint256 aTokensBefore = IERC20(aToken).balanceOf(address(this));
-
+        
         address lendingPool =
             ILendingPoolAddressesProvider(lendingPoolAddressesProvider)
                 .getLendingPool();
+
 
         //approve collateral to vault
         IERC20(asset).approve(lendingPool, amount);

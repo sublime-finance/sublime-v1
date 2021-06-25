@@ -14,8 +14,6 @@ import "../interfaces/IPool.sol";
 import "../interfaces/IExtension.sol";
 import "../interfaces/IPoolToken.sol";
 
-import "hardhat/console.sol";
-
 contract Pool is Initializable, IPool, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using SafeMath for uint256;

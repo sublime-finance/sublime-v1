@@ -16,7 +16,7 @@
           "@typechain/*": ["typechain/*"],
       }
     },
-    "include": ["./test/**/*.ts", "./utils/**/*.ts", "./deploy/**/*.ts", "./typechain/**/*.ts", "test/Pool/Pool.spec.js"],
+    "include": ["./test/**/*.ts", "./utils/**/*.ts", "./deploy/**/*.ts", "./typechain/**/*.ts", "test/Pool/Pool.spec.js", "./scripts/**/*.ts"],
     "exclude": ["./existingContracts/*"],
     "files": [
       "hardhat.config.ts",

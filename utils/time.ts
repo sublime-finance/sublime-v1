@@ -1,8 +1,8 @@
-import { Network } from "hardhat/types";
+import { Network } from 'hardhat/types';
 
 export async function timeTravel(network: Network, time: number) {
     await network.provider.request({
-        method: "evm_increaseTime",
+        method: 'evm_increaseTime',
         params: [time],
     });
 }
@@ -10,7 +10,7 @@ export async function timeTravel(network: Network, time: number) {
 export async function blocksTravel(network: Network, blocks: number) {
     for (let index = 0; index < blocks; index++) {
         await network.provider.request({
-            method: "evm_mine",
+            method: 'evm_mine',
             params: [],
         });
     }
@@ -18,7 +18,7 @@ export async function blocksTravel(network: Network, blocks: number) {
 
 export async function blockTravel(network: Network, time: number) {
     await network.provider.request({
-        method: "evm_mine",
+        method: 'evm_mine',
         params: [time],
     });
 }
@@ -29,13 +29,13 @@ export async function incrementChain(
     blockTime: number = 15000
 ) {
     await network.provider.request({
-        method: "evm_increaseTime",
+        method: 'evm_increaseTime',
         params: [blocks * blockTime],
     });
-  
+
     for (let index = 0; index < blocks; index++) {
         await network.provider.request({
-            method: "evm_mine",
+            method: 'evm_mine',
             params: [],
         });
     }

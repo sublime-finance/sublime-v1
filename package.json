@@ -10,7 +10,9 @@
     "prettier": "prettier --write '{test,utils,scripts,types}/**/*.{ts,js,json}' && prettier --write hardhat.config.ts",
     "flatten": "npx waffle flatten",
     "lint-sol": "npx prettier --write 'contracts/**/*.sol'",
-    "lint-ts": "tslint -c tslint.json -p tsconfig.json '{utils,test}/**/*.{ts}' --fix"
+    "lint-ts": "tslint -c tslint.json -p tsconfig.json '{utils,test}/**/*.{ts}' --fix",
+    "deploy": "npx hardhat run scripts/deploy.ts --network",
+    "listAccount":"npx hardhat accounts --network"
   },
   "repository": {
     "type": "git",

@@ -221,7 +221,7 @@ contract SavingsAccount is ISavingsAccount, Initializable, OwnableUpgradeable {
      */
     function withdraw(
         address payable withdrawTo,
-        uint256 amount,
+        uint256 amount, // this is token amonut (not liquidity share amount)
         address asset,
         address strategy,
         bool withdrawShares
@@ -313,6 +313,7 @@ contract SavingsAccount is ISavingsAccount, Initializable, OwnableUpgradeable {
                     token != address(0),
                     "Liquidity Tokens address cannot be address(0)"
                 );
+                // uint256 sharesToWithdraw = IYield(strategy).getSharesForTokens(amount, asset);
                 amountReceived = IYield(strategy).unlockShares(token, amount);
                 _transfer(token, withdrawTo, amountReceived);
             } else {
