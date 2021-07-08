@@ -6,6 +6,21 @@ import '@openzeppelin/contracts/token/ERC20/SafeERC20.sol';
 library SavingsAccountUtil {
     using SafeERC20 for IERC20;
 
+    /*
+    * @notice Used in Pool to handle deposits into savings account, depending on whether deposits are being made to a savings account or external wallets
+    * @param _savingsAccount savings account instance
+    * @param _from sender address
+    * @param _to receiver address
+    * @param _amount amount to be transferred
+    * @param _asset asset to be transferred
+    * @param _strategy if _toSavingsAccount is true, _strategy is the savings strategy address from which 
+    *                  _amount is pulled and deposited into. If false, _strategy is the savings strategy 
+    *                  from which _amount is pulled
+    * @param _withdrawShares if true, LP tokens are deposited directly without unlocking into base assets. 
+    *                        If false, LP tokens are converted into base tokens and then withdrawn
+    * @param _toSavingsAccount if true, deposit is being made to another savings account. if false, _to 
+    *                          is an external address
+    */
     function depositFromSavingsAccount(
         ISavingsAccount _savingsAccount,
         address _from,
@@ -23,6 +38,17 @@ library SavingsAccountUtil {
         }
     }
 
+    /*
+    * @notice invoked by _deposit() in Pool.sol when deposit is made from an external wallet
+    * @param _savingsAccount savings account instance
+    * @param _from sender address
+    * @param _to receiver address
+    * @param _amount amount to be deposited
+    * @param _asset asset to be deposited
+    * @param _toSavingsAccount if true, deposit is being made to a savings account. if false, deposit is being 
+    *                           made to an external account
+    * @param _strategy if _toSavingsAccount is true, _strategy is the strategy into which _amount is getting deposited
+    */
     function directDeposit(
         ISavingsAccount _savingsAccount,
         address _from,
@@ -39,6 +65,15 @@ library SavingsAccountUtil {
         }
     }
 
+    /*
+    * @notice invoked when amount is deposited to savings account from an external wallet
+    * @param _savingsAccount savings account instance
+    * @param _from sender address
+    * @param _to receiver address
+    * @param _amount amount to be transferred
+    * @param _asset asset to be transferred
+    * @param _strategy savings account strategy into wihch amount should be transferred
+    */
     function directSavingsAccountDeposit(
         ISavingsAccount _savingsAccount,
         address _from,
@@ -61,6 +96,16 @@ library SavingsAccountUtil {
         _sharesReceived = _savingsAccount.depositTo{value: _ethValue}(_amount, _asset, _strategy, _to);
     }
 
+    /*
+    * @notice invoked when transfer is being made from one savings account to another savings account
+    * @param _savingsAccount savings account instance
+    * @param _from sender address
+    * @param _to receiver address
+    * @param _amount amount to be transferred
+    * @param _asset asset to be transferred
+    * @param _strategy strategy from which amount is withdrawn from _from and also the strategy into which
+    *                   it is deposited in _to
+    */
     function savingsAccountTransfer(
         ISavingsAccount _savingsAccount,
         address _from,
@@ -77,6 +122,17 @@ library SavingsAccountUtil {
         return _amount;
     }
 
+    /*
+    * @notice used to withdraw assets from a savings account to a given address
+    * @param _savingsAccount savings account instance
+    * @param _from sender address
+    * @param _to receiver address
+    * @param _amount amount to be withdrawn
+    * @param _asset asset to be transferred
+    * @param _strategy strategy from which assets are withdrawn
+    * @param _withdrawShares if true, assets as withdrawn as LP tokens. if false, LP tokens are converted
+    *                           into underlying base tokens and then withdrawn
+    */
     function withdrawFromSavingsAccount(
         ISavingsAccount _savingsAccount,
         address _from,
@@ -100,6 +156,13 @@ library SavingsAccountUtil {
         }
     }
 
+    /*
+    * @notice used to make the actual transfer of tokens between _from and _to
+    * @param _asset asset to be transferred
+    * @param _amount amount to be transferred
+    * @param _from sender address
+    * @param _to receiver address
+    */
     function transferTokens(
         address _asset,
         uint256 _amount,

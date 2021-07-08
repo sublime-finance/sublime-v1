@@ -275,6 +275,14 @@ contract Pool is Initializable, IPool, ReentrancyGuard {
         emit CollateralAdded(_depositor, _amount, _sharesReceived);
     }
 
+    /*
+    * @notice internal function reused to perform deposits
+    * @param _fromSavingsAccount if true, _amount is withdrawn from _depositFrom's Savings Account
+    * @param _toSavingsAccount if true, _amount is deposited to _depositTo's Savings Account
+    * @param _asset asset to be deposited
+    * @param _amount amount to be deposited
+    * @param _poolSavingsStrategy strategy to be used to m
+    */
     function _deposit(
         bool _fromSavingsAccount,
         bool _toSavingsAccount,

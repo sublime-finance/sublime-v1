@@ -57,7 +57,14 @@ contract CreditLine is CreditLineStorage, ReentrancyGuard {
         _;
     }
 
+    /*
+    * @notice emitted when borrower requests a credit line to lender
+    * @param creditLineHash creditLine hash
+    * @param lender lender address
+    * @param borrower borrower address
+    */
     event CreditLineRequestedToLender(bytes32 creditLineHash, address lender, address borrower);
+
     event CreditLineRequestedToBorrower(bytes32 creditLineHash, address lender, address borrower);
 
     event CreditLineLiquidated(bytes32 creditLineHash, address liquidator);
@@ -100,17 +107,13 @@ contract CreditLine is CreditLineStorage, ReentrancyGuard {
      * @param creditLineHash Hash of the credit line for which interest accrued has to be calculated
      * @return uint256 interest accrued over current borrowed amount since last repayment
      */
-
     function calculateInterestAccrued(bytes32 creditLineHash) public view returns (uint256) {
         uint256 _lastPrincipleUpdateTime = creditLineUsage[creditLineHash].lastPrincipalUpdateTime;
         if (_lastPrincipleUpdateTime == 0) return 0;
         uint256 _timeElapsed = (block.timestamp).sub(_lastPrincipleUpdateTime);
-        uint256 _interestAccrued =
-            calculateInterest(
-                creditLineUsage[creditLineHash].principal,
-                creditLineInfo[creditLineHash].borrowRate,
-                _timeElapsed
-            );
+        uint256 _interestAccrued = calculateInterest(creditLineUsage[creditLineHash].principal,
+                                                    creditLineInfo[creditLineHash].borrowRate,
+                                                    _timeElapsed);
         return _interestAccrued;
     }
 
@@ -123,11 +126,10 @@ contract CreditLine is CreditLineStorage, ReentrancyGuard {
     // maybe change interestAccruedTillPrincipalUpdate to interestAccruedTillLastPrincipalUpdate
     function calculateCurrentDebt(bytes32 _creditLineHash) public view returns (uint256) {
         uint256 _interestAccrued = calculateInterestAccrued(_creditLineHash);
-        uint256 _currentDebt =
-            (creditLineUsage[_creditLineHash].principal)
-                .add(creditLineUsage[_creditLineHash].interestAccruedTillPrincipalUpdate)
-                .add(_interestAccrued)
-                .sub(creditLineUsage[_creditLineHash].totalInterestRepaid);
+        uint256 _currentDebt = (creditLineUsage[_creditLineHash].principal)
+                                .add(creditLineUsage[_creditLineHash].interestAccruedTillPrincipalUpdate)
+                                .add(_interestAccrued)
+                                .sub(creditLineUsage[_creditLineHash].totalInterestRepaid);
         return _currentDebt;
     }
 
@@ -465,30 +467,13 @@ contract CreditLine is CreditLineStorage, ReentrancyGuard {
         emit BorrowedFromCreditLine(borrowAmount, creditLineHash);
     }
 
-    //TODO:- Make the function to accept ether as well
     /**
-     * @dev used to repay assest to credit line
-     * @param _repayAmount amount which borrower wants to repay to credit line
-     * @param _creditLineHash Credit line hash which represents the credit Line Unique Hash
+     * @notice internal function used to repay credit line
+     * @param _repayAmount amount which borrower wants to repay 
+     * @param _creditLineHash Credit line hash
+     * @param _transferFromSavingAccount if true, amount is transferred from borrower's savings account
      */
-
-    /*
-        Parameters used:
-        - currentStatus
-        - borrowAsset
-        - interestAccruedTillPrincipalUpdate
-        - principal
-        - totalInterestRepaid
-        - lastPrincipalUpdateTime
-
-
-
-    */
-    function repay(
-        bytes32 _creditLineHash,
-        bool _transferFromSavingAccount,
-        uint256 _repayAmount
-    ) internal {
+    function _repay(bytes32 _creditLineHash, bool _transferFromSavingAccount, uint256 _repayAmount) internal {
         address _borrowAsset = creditLineInfo[_creditLineHash].borrowAsset;
         address _lender = creditLineInfo[_creditLineHash].lender;
         ISavingsAccount _savingsAccount = ISavingsAccount(IPoolFactory(PoolFactory).savingsAccount());
@@ -506,6 +491,12 @@ contract CreditLine is CreditLineStorage, ReentrancyGuard {
         _savingsAccount.approveFromToCreditLine(_borrowAsset, _lender, _repayAmount);
     }
 
+    /*
+    * @notice external function called to repay a credit line
+    * @param repayAmount amount to be repaid
+    * @param creditLineHash credit line hash
+    * @param _transferFromSavingAccount if true, amount is transferred from borrower's savings account
+    */
     function repayCreditLine(
         uint256 repayAmount,
         bytes32 creditLineHash,
@@ -524,14 +515,12 @@ contract CreditLine is CreditLineStorage, ReentrancyGuard {
         require(_totalDebt >= repayAmount, 'CreditLine: Repay amount is greater than debt.');
 
         if (_totalRepaidNow > _totalInterestAccrued) {
-            creditLineUsage[creditLineHash].principal = (creditLineUsage[creditLineHash].principal)
-                .add(_totalInterestAccrued)
-                .sub(_totalRepaidNow);
+            creditLineUsage[creditLineHash].principal = (creditLineUsage[creditLineHash].principal).add(_totalInterestAccrued).sub(_totalRepaidNow);
             creditLineUsage[creditLineHash].interestAccruedTillPrincipalUpdate = _totalInterestAccrued;
             creditLineUsage[creditLineHash].lastPrincipalUpdateTime = block.timestamp;
         }
         creditLineUsage[creditLineHash].totalInterestRepaid = _totalRepaidNow;
-        repay(creditLineHash, _transferFromSavingAccount, repayAmount);
+        _repay(creditLineHash, _transferFromSavingAccount, repayAmount);
 
         if (creditLineUsage[creditLineHash].principal == 0) {
             _resetCreditLine(creditLineHash);
@@ -539,6 +528,10 @@ contract CreditLine is CreditLineStorage, ReentrancyGuard {
         emit PartialCreditLineRepaid(creditLineHash, repayAmount);
     }
 
+    /*
+    * @notice internal function called by repayCreditLine if principal borrowed reaches zero
+    * @param creditLineHash credit line hash
+    */
     function _resetCreditLine(bytes32 creditLineHash) internal {
         creditLineUsage[creditLineHash].lastPrincipalUpdateTime = 0; // check if can assign 0 or not
         creditLineUsage[creditLineHash].totalInterestRepaid = 0;
