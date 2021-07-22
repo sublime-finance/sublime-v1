@@ -19,6 +19,8 @@ interface IYield {
 
     event UnlockedShares(address asset, uint256 sharesReleased);
 
+    event SavingsAccountUpdated(address savingsAccount);
+
     /**
      * @dev Used to get liquidity token address from asset address
      * @param asset the address of underlying token

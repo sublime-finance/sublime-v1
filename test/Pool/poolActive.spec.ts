@@ -160,8 +160,6 @@ describe('Pool Active stage', async () => {
         await poolFactory
             .connect(admin)
             .initialize(
-                verification.address,
-                strategyRegistry.address,
                 admin.address,
                 _collectionPeriod,
                 _matchCollateralRatioInterval,
@@ -171,9 +169,6 @@ describe('Pool Active stage', async () => {
                 _poolInitFuncSelector,
                 _poolTokenInitFuncSelector,
                 _liquidatorRewardFraction,
-                priceOracle.address,
-                savingsAccount.address,
-                extenstion.address,
                 _poolCancelPenalityFraction
             );
         await poolFactory.connect(admin).updateSupportedBorrowTokens(Contracts.LINK, true);
@@ -187,14 +182,22 @@ describe('Pool Active stage', async () => {
         await repaymentImpl
             .connect(admin)
             .initialize(
-                admin.address,
                 poolFactory.address,
                 repaymentParams.gracePenalityRate,
                 repaymentParams.gracePeriodFraction,
                 savingsAccount.address
             );
 
-        await poolFactory.connect(admin).setImplementations(poolImpl.address, repaymentImpl.address, poolTokenImpl.address);
+        await poolFactory.connect(admin).setImplementations(
+            poolImpl.address, 
+            repaymentImpl.address, 
+            poolTokenImpl.address,
+            verification.address,
+            strategyRegistry.address,
+            priceOracle.address,
+            savingsAccount.address,
+            extenstion.address
+        );
     });
 
     describe('Pool that borrows ERC20 with ERC20 as collateral', async () => {

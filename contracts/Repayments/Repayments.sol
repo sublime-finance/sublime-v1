@@ -2,21 +2,26 @@
 pragma solidity 0.7.0;
 
 import '@openzeppelin/contracts/token/ERC20/SafeERC20.sol';
+import '@openzeppelin/contracts-upgradeable/proxy/Initializable.sol';
 import '@openzeppelin/contracts/math/SafeMath.sol';
+import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import './RepaymentStorage.sol';
 import '../interfaces/IPool.sol';
 import '../interfaces/IRepayment.sol';
 import '../interfaces/ISavingsAccount.sol';
 
-contract Repayments is RepaymentStorage, IRepayment {
+contract Repayments is Initializable, RepaymentStorage, IRepayment, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
-
-    address PoolFactory;
 
     event InterestRepaid(address poolID, uint256 repayAmount); // Made during current period interest repayment
     event MissedRepaymentRepaid(address poolID); // Previous period's interest is repaid fully
     event PartialExtensionRepaymentMade(address poolID); // Previous period's interest is repaid partially
+
+    event PoolFactoryUpdated(address poolFactory);
+    event SavingsAccountUpdated(address savingnsAccount);
+    event GracePenalityRateUpdated(uint256 gracePenaltyRate);
+    event GracePeriodFractionUpdated(uint256 gracePeriodFraction);
 
     modifier isPoolInitialized(address _poolID) {
         require(repaymentConstants[_poolID].numberOfTotalRepayments != 0, 'Pool is not Initiliazed');
@@ -25,27 +30,65 @@ contract Repayments is RepaymentStorage, IRepayment {
 
     modifier onlyValidPool {
         require(
-            IPoolFactory(PoolFactory).openBorrowPoolRegistry(msg.sender),
+            poolFactory.openBorrowPoolRegistry(msg.sender),
             'Repayments::onlyValidPool - Invalid Pool'
         );
         _;
     }
 
+    modifier onlyOwner() {
+        require(msg.sender == poolFactory.owner(), "Not owner");
+        _;
+    }
+
     function initialize(
-        address _owner,
         address _poolFactory,
         uint256 _gracePenaltyRate,
         uint256 _gracePeriodFraction,
         address _savingsAccount
     ) public initializer {
-        // _votingExtensionlength - should enforce conditions with repaymentInterval
-        OwnableUpgradeable.__Ownable_init();
-        OwnableUpgradeable.transferOwnership(_owner);
+        _updatePoolFactory(_poolFactory);
+        _updateGracePenalityRate(_gracePenaltyRate);
+        _updateGracePeriodFraction(_gracePeriodFraction);
+        _updateSavingsAccount(_savingsAccount);
+    }
 
-        PoolFactory = _poolFactory;
-        savingsAccount = _savingsAccount;
-        gracePenaltyRate = _gracePenaltyRate;
+    function updatePoolFactory(address _poolFactory) public onlyOwner {
+        _updatePoolFactory(_poolFactory);
+    }
+
+    function _updatePoolFactory(address _poolFactory) internal {
+        require(_poolFactory != address(0), "0 address not allowed");
+        poolFactory = IPoolFactory(_poolFactory);
+        emit PoolFactoryUpdated(_poolFactory);
+    }
+
+    function updateGracePeriodFraction(uint256 _gracePeriodFraction) public onlyOwner {
+        _updateGracePeriodFraction(_gracePeriodFraction);
+    }
+
+    function _updateGracePeriodFraction(uint256 _gracePeriodFraction) internal {
         gracePeriodFraction = _gracePeriodFraction;
+        emit GracePeriodFractionUpdated(_gracePeriodFraction);
+    }
+
+    function updateGracePenalityRate(uint256 _gracePenaltyRate) public onlyOwner {
+        _updateGracePenalityRate(_gracePenaltyRate);
+    }
+
+    function _updateGracePenalityRate(uint256 _gracePenaltyRate) internal {
+        gracePenaltyRate = _gracePenaltyRate;
+        emit GracePenalityRateUpdated(_gracePenaltyRate);
+    }
+
+    function updateSavingsAccount(address _savingsAccount) public onlyOwner {
+        _updateSavingsAccount(_savingsAccount);
+    }
+
+    function _updateSavingsAccount(address _savingsAccount) internal {
+        require(_savingsAccount != address(0), "0 address not allowed");
+        savingsAccount = _savingsAccount;
+        emit SavingsAccountUpdated(_savingsAccount);
     }
 
     function initializeRepayment(
@@ -109,12 +152,6 @@ contract Repayments is RepaymentStorage, IRepayment {
         return _interestDueTillInstalmentDeadline;
     }
 
-    /*
-    function updateLoanExtensionPeriod(address _poolID, uint256 _period) 
-        external 
-    {
-        repaymentVars[_poolID].loanExtensionPeriod = _period;
-    }*/
     // return timestamp before which next instalment ends
     function getNextInstalmentDeadline(address _poolID) public view override returns (uint256) {
         uint256 _instalmentsCompleted = getInstalmentsCompleted(_poolID);
@@ -249,7 +286,7 @@ contract Repayments is RepaymentStorage, IRepayment {
         return _interestOverdue;
     }
 
-    function repayAmount(address _poolID, uint256 _amount) public payable isPoolInitialized(_poolID) {
+    function repayAmount(address _poolID, uint256 _amount) public payable nonReentrant isPoolInitialized(_poolID) {
         IPool _pool = IPool(_poolID);
         _amount = _amount * 10**30;
 
@@ -319,19 +356,21 @@ contract Repayments is RepaymentStorage, IRepayment {
 
         if (_asset == address(0)) {
             require(_amountRequired <= msg.value, 'Repayments::repayAmount amount does not match message value.');
-            payable(address(_poolID)).transfer(_amountRequired);
+            (bool success, ) = payable(address(_poolID)).call{ value: _amountRequired }("");
+            require(success, "Transfer failed");
         } else {
-            IERC20(_asset).transferFrom(msg.sender, _poolID, _amountRequired);
+            IERC20(_asset).safeTransferFrom(msg.sender, _poolID, _amountRequired);
         }
 
         if (_asset == address(0)) {
             if (msg.value > _amountRequired) {
-                payable(address(msg.sender)).transfer(msg.value.sub(_amountRequired));
+                (bool success, ) = payable(address(msg.sender)).call{ value: msg.value.sub(_amountRequired) }("");
+                require(success, "Transfer failed");
             }
         }
     }
 
-    function repayPrincipal(address payable _poolID, uint256 _amount) public payable isPoolInitialized(_poolID) {
+    function repayPrincipal(address payable _poolID, uint256 _amount) public payable nonReentrant isPoolInitialized(_poolID) {
         IPool _pool = IPool(_poolID);
         uint256 _loanStatus = _pool.getLoanStatus();
         require(_loanStatus == 1, 'Repayments:repayPrincipal Pool should be active');
@@ -353,9 +392,10 @@ contract Repayments is RepaymentStorage, IRepayment {
 
         if (_asset == address(0)) {
             require(_amount == msg.value, 'Repayments::repayAmount amount does not match message value.');
-            _poolID.transfer(_amount);
+            (bool success, ) = _poolID.call{ value: _amount}("");
+            require(success, "Transfer failed");
         } else {
-            IERC20(_asset).transferFrom(msg.sender, _poolID, _amount);
+            IERC20(_asset).safeTransferFrom(msg.sender, _poolID, _amount);
         }
 
         IPool(_poolID).closeLoan();
@@ -371,7 +411,7 @@ contract Repayments is RepaymentStorage, IRepayment {
     }
 
     function instalmentDeadlineExtended(address _poolID, uint256 _period) external override {
-        require(msg.sender == IPoolFactory(PoolFactory).extension(), 'Repayments::repaymentExtended - Invalid caller');
+        require(msg.sender == poolFactory.extension(), 'Repayments::repaymentExtended - Invalid caller');
 
         repaymentVars[_poolID].isLoanExtensionActive = true;
         repaymentVars[_poolID].loanExtensionPeriod = _period;

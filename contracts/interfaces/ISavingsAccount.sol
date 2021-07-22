@@ -9,6 +9,8 @@ interface ISavingsAccount {
     event WithdrawnAll(address user, uint256 tokenReceived, address asset);
     event Approved(address token, address from, address to, uint256 amount);
     event Transfer(address token, address strategy, address from, address to, uint256 amount);
+    event CreditLineUpdated(address _updatedCreditLine);
+    event StrategyRegistryUpdated(address _updatedStrategyRegistry);
 
     event CreditLineAllowanceRefreshed(address token, address from, uint256 amount);
 
@@ -52,6 +54,18 @@ interface ISavingsAccount {
     function withdrawAll(address _asset) external returns (uint256 tokenReceived);
 
     function approve(
+        address token,
+        address to,
+        uint256 amount
+    ) external;
+
+    function increaseAllowance(
+        address token,
+        address to,
+        uint256 amount
+    ) external;
+
+    function decreaseAllowance(
         address token,
         address to,
         uint256 amount

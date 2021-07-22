@@ -2,6 +2,7 @@
 pragma solidity 0.7.0;
 
 import '@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol';
+import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import '@openzeppelin/contracts/token/ERC20/SafeERC20.sol';
 import '@openzeppelin/contracts/math/SafeMath.sol';
 
@@ -16,7 +17,7 @@ import '../interfaces/Invest/IProtocolDataProvider.sol';
  * @notice Implements the functions to lock/unlock tokens into Aave protocol
  * @author Sublime
  **/
-contract AaveYield is IYield, Initializable, OwnableUpgradeable {
+contract AaveYield is IYield, Initializable, OwnableUpgradeable, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
 
@@ -27,6 +28,13 @@ contract AaveYield is IYield, Initializable, OwnableUpgradeable {
 
     address payable public savingsAccount;
     uint16 public referralCode;
+
+    event AaveAddressesUpdated(
+        address indexed wethGateway,
+        address indexed protocolDataProvider,
+        address indexed lendingPoolAddressesProvider
+    );
+    event ReferralCodeUpdated(uint16 referralCode);
 
     modifier onlySavingsAccount {
         require(_msgSender() == savingsAccount, 'Invest: Only savings account can invoke');
@@ -48,15 +56,8 @@ contract AaveYield is IYield, Initializable, OwnableUpgradeable {
         __Ownable_init();
         super.transferOwnership(_owner);
 
-        require(_savingsAccount != address(0), 'Invest: SavingsAccount:: zero address');
-        require(_wethGateway != address(0), 'Invest: WETHGateway:: zero address');
-        require(_protocolDataProvider != address(0), 'Invest: protocolDataProvider:: zero address');
-        require(_lendingPoolAddressesProvider != address(0), 'Invest: lendingPoolAddressesProvider:: zero address');
-
-        savingsAccount = _savingsAccount;
-        wethGateway = _wethGateway;
-        protocolDataProvider = _protocolDataProvider;
-        lendingPoolAddressesProvider = _lendingPoolAddressesProvider;
+        _updateSavingsAccount(_savingsAccount);
+        _updateAaveAddresses(_wethGateway, _protocolDataProvider, _lendingPoolAddressesProvider);
     }
 
     /**
@@ -72,26 +73,45 @@ contract AaveYield is IYield, Initializable, OwnableUpgradeable {
         }
     }
 
-    function updateSavingsAccount(address payable _savingsAccount) external onlyOwner {
+    function updateSavingsAccount(address payable _savingsAccount) public onlyOwner {
+        _updateSavingsAccount(_savingsAccount);
+    }
+
+    function _updateSavingsAccount(address payable _savingsAccount) internal {
         require(_savingsAccount != address(0), 'Invest: zero address');
         savingsAccount = _savingsAccount;
+        emit SavingsAccountUpdated(_savingsAccount);
     }
 
     function updateAaveAddresses(
         address _wethGateway,
         address _protocolDataProvider,
         address _lendingPoolAddressesProvider
-    ) external onlyOwner {
+    ) public onlyOwner {
+        _updateAaveAddresses(
+            _wethGateway,
+            _protocolDataProvider,
+            _lendingPoolAddressesProvider
+        );
+    }
+
+    function _updateAaveAddresses(
+        address _wethGateway,
+        address _protocolDataProvider,
+        address _lendingPoolAddressesProvider
+    ) internal {
         require(_wethGateway != address(0), 'Invest: WETHGateway:: zero address');
         require(_protocolDataProvider != address(0), 'Invest: protocolDataProvider:: zero address');
         require(_lendingPoolAddressesProvider != address(0), 'Invest: lendingPoolAddressesProvider:: zero address');
         wethGateway = _wethGateway;
         protocolDataProvider = _protocolDataProvider;
         lendingPoolAddressesProvider = _lendingPoolAddressesProvider;
+        emit AaveAddressesUpdated(_wethGateway, _protocolDataProvider, _lendingPoolAddressesProvider);
     }
 
     function updateReferralCode(uint16 _referralCode) external onlyOwner {
         referralCode = _referralCode;
+        emit ReferralCodeUpdated(_referralCode);
     }
 
     function emergencyWithdraw(address _asset, address payable _wallet) external onlyOwner returns (uint256 received) {
@@ -99,7 +119,8 @@ contract AaveYield is IYield, Initializable, OwnableUpgradeable {
 
         if (_asset == address(0)) {
             received = _withdrawETH(amount);
-            _wallet.transfer(received);
+            (bool success, ) = _wallet.call{ value: received }("");
+            require(success, "Transfer failed");
         } else {
             received = _withdrawERC(_asset, amount);
             IERC20(_asset).safeTransfer(_wallet, received);
@@ -117,7 +138,7 @@ contract AaveYield is IYield, Initializable, OwnableUpgradeable {
         address user,
         address asset,
         uint256 amount
-    ) public payable override onlySavingsAccount returns (uint256 sharesReceived) {
+    ) public payable override onlySavingsAccount nonReentrant returns (uint256 sharesReceived) {
         require(amount != 0, 'Invest: amount');
 
         address investedTo;
@@ -138,12 +159,13 @@ contract AaveYield is IYield, Initializable, OwnableUpgradeable {
      * @param amount the amount of asset
      * @return received amount of tokens received
      **/
-    function unlockTokens(address asset, uint256 amount) public override onlySavingsAccount returns (uint256 received) {
+    function unlockTokens(address asset, uint256 amount) public override onlySavingsAccount nonReentrant returns (uint256 received) {
         require(amount != 0, 'Invest: amount');
 
         if (asset == address(0)) {
             received = _withdrawETH(amount);
-            savingsAccount.transfer(received);
+            (bool success, ) = savingsAccount.call{ value: received }("");
+            require(success, "Transfer failed");
         } else {
             received = _withdrawERC(asset, amount);
             IERC20(asset).safeTransfer(savingsAccount, received);
@@ -152,7 +174,7 @@ contract AaveYield is IYield, Initializable, OwnableUpgradeable {
         emit UnlockedTokens(asset, received);
     }
 
-    function unlockShares(address asset, uint256 amount) public override onlySavingsAccount returns (uint256) {
+    function unlockShares(address asset, uint256 amount) public override onlySavingsAccount nonReentrant returns (uint256) {
         if (amount == 0) {
             return 0;
         }

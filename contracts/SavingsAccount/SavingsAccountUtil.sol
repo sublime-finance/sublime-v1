@@ -2,6 +2,7 @@ pragma solidity 0.7.0;
 
 import '../interfaces/ISavingsAccount.sol';
 import '@openzeppelin/contracts/token/ERC20/SafeERC20.sol';
+import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 
 library SavingsAccountUtil {
     using SafeERC20 for IERC20;
@@ -109,19 +110,21 @@ library SavingsAccountUtil {
         if (_asset == address(0)) {
             require(msg.value >= _amount, '');
             if (_to != address(this)) {
-                payable(_to).transfer(_amount);
+                (bool success, ) = payable(_to).call{ value: _amount }("");
+                require(success, "Transfer failed");
             }
             if (msg.value >= _amount) {
-                payable(address(msg.sender)).transfer(msg.value - _amount);
+                (bool success, ) = payable(address(msg.sender)).call{ value: msg.value - _amount }("");
+                require(success, "Transfer failed");
             } else {
                 revert('Insufficient Ether');
             }
             return _amount;
         }
         if (_from == address(this)) {
-            IERC20(_asset).transfer(_to, _amount);
+            IERC20(_asset).safeTransfer(_to, _amount);
         } else {
-            IERC20(_asset).transferFrom(_from, _to, _amount);
+            IERC20(_asset).safeTransferFrom(_from, _to, _amount);
         }
         return _amount;
     }

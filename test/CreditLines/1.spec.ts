@@ -157,6 +157,7 @@ describe('Credit Lines', async () => {
         });
 
         it('Initialize required contracts', async () => {
+            const deployHelper: DeployHelper = new DeployHelper(proxyAdmin);
             await extenstion.connect(admin).initialize(poolFactory.address, extensionParams.votingPassRatio);
 
             let {
@@ -174,8 +175,6 @@ describe('Credit Lines', async () => {
             await poolFactory
                 .connect(admin)
                 .initialize(
-                    verification.address,
-                    strategyRegistry.address,
                     admin.address,
                     _collectionPeriod,
                     _matchCollateralRatioInterval,
@@ -185,13 +184,29 @@ describe('Credit Lines', async () => {
                     _poolInitFuncSelector,
                     _poolTokenInitFuncSelector,
                     _liquidatorRewardFraction,
-                    priceOracle.address,
-                    savingsAccount.address,
-                    extenstion.address,
                     _poolCancelPenalityFraction
                 );
+                
+            const poolImpl = await deployHelper.pool.deployPool();
+            const poolTokenImpl = await deployHelper.pool.deployPoolToken();
+            const repaymentImpl = await deployHelper.pool.deployRepayments();
+            await poolFactory.connect(admin).setImplementations(
+                poolImpl.address, 
+                repaymentImpl.address, 
+                poolTokenImpl.address,
+                verification.address,
+                strategyRegistry.address,
+                priceOracle.address,
+                savingsAccount.address,
+                extenstion.address
+            );
 
-            await creditLine.connect(admin).initialize(yearnYield.address, poolFactory.address, strategyRegistry.address);
+            await creditLine.connect(admin).initialize(
+                yearnYield.address, 
+                poolFactory.address, 
+                strategyRegistry.address,
+                admin.address
+            );
         });
 
         it('Check global variables', async () => {
@@ -350,6 +365,7 @@ describe('Credit Lines', async () => {
             });
 
             it('Initialize required contracts', async () => {
+                const deployHelper: DeployHelper = new DeployHelper(proxyAdmin);
                 await extenstion.connect(admin).initialize(poolFactory.address, extensionParams.votingPassRatio);
 
                 let {
@@ -367,8 +383,6 @@ describe('Credit Lines', async () => {
                 await poolFactory
                     .connect(admin)
                     .initialize(
-                        verification.address,
-                        strategyRegistry.address,
                         admin.address,
                         _collectionPeriod,
                         _matchCollateralRatioInterval,
@@ -378,13 +392,29 @@ describe('Credit Lines', async () => {
                         _poolInitFuncSelector,
                         _poolTokenInitFuncSelector,
                         _liquidatorRewardFraction,
-                        priceOracle.address,
-                        savingsAccount.address,
-                        extenstion.address,
                         _poolCancelPenalityFraction
                     );
-
-                await creditLine.connect(admin).initialize(yearnYield.address, poolFactory.address, strategyRegistry.address);
+                
+                const poolImpl = await deployHelper.pool.deployPool();
+                const poolTokenImpl = await deployHelper.pool.deployPoolToken();
+                const repaymentImpl = await deployHelper.pool.deployRepayments();
+                await poolFactory.connect(admin).setImplementations(
+                    poolImpl.address, 
+                    repaymentImpl.address, 
+                    poolTokenImpl.address,
+                    verification.address,
+                    strategyRegistry.address,
+                    priceOracle.address,
+                    savingsAccount.address,
+                    extenstion.address
+                );
+                    
+                await creditLine.connect(admin).initialize(
+                    yearnYield.address, 
+                    poolFactory.address, 
+                    strategyRegistry.address,
+                    admin.address
+                );
             });
 
             it('Check global variables', async () => {

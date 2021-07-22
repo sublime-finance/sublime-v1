@@ -2,6 +2,7 @@
 pragma solidity 0.7.0;
 
 import '@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol';
+import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import '@openzeppelin/contracts/token/ERC20/SafeERC20.sol';
 import '@openzeppelin/contracts/math/SafeMath.sol';
 
@@ -14,7 +15,7 @@ import '../interfaces/IYield.sol';
  * @notice Implements the functions related to savings account
  * @author Sublime
  **/
-contract SavingsAccount is ISavingsAccount, Initializable, OwnableUpgradeable {
+contract SavingsAccount is ISavingsAccount, Initializable, OwnableUpgradeable, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
 
@@ -44,22 +45,31 @@ contract SavingsAccount is ISavingsAccount, Initializable, OwnableUpgradeable {
         address _strategyRegistry,
         address _creditLine
     ) public initializer {
-        require(_strategyRegistry != address(0), 'SavingsAccount::initialize zero address');
         __Ownable_init();
         super.transferOwnership(_owner);
 
-        strategyRegistry = _strategyRegistry;
-        CreditLine = _creditLine;
+        _updateCreditLine(_creditLine);
+        _updateStrategyRegistry(_strategyRegistry);
     }
 
-    function updateCreditLine(address _creditLine) external onlyOwner {
-        CreditLine = _creditLine;
+    function updateCreditLine(address _creditLine) public onlyOwner {
+        _updateCreditLine(_creditLine);
     }
 
-    function updateStrategyRegistry(address _strategyRegistry) external onlyOwner {
+    function _updateCreditLine(address _creditLine) internal {
+        require(_creditLine != address(0), 'SavingsAccount::initialize zero address');
+        CreditLine = _creditLine;
+        emit CreditLineUpdated(_creditLine);
+    }
+
+    function updateStrategyRegistry(address _strategyRegistry) public onlyOwner {
+        _updateStrategyRegistry(_strategyRegistry);
+    }
+
+    function _updateStrategyRegistry(address _strategyRegistry) internal {
         require(_strategyRegistry != address(0), 'SavingsAccount::updateStrategyRegistry zero address');
-
         strategyRegistry = _strategyRegistry;
+        emit StrategyRegistryUpdated(_strategyRegistry);
     }
 
     function depositTo(
@@ -81,7 +91,7 @@ contract SavingsAccount is ISavingsAccount, Initializable, OwnableUpgradeable {
         uint256 amount,
         address asset,
         address strategy
-    ) internal returns (uint256 sharesReceived) {
+    ) internal nonReentrant returns (uint256 sharesReceived) {
         require(amount != 0, 'SavingsAccount::_deposit Amount must be greater than zero');
 
         if (strategy != address(0)) {
@@ -125,7 +135,7 @@ contract SavingsAccount is ISavingsAccount, Initializable, OwnableUpgradeable {
         address newStrategy,
         address asset,
         uint256 amount
-    ) external override {
+    ) external nonReentrant override {
         require(currentStrategy != newStrategy, 'SavingsAccount::switchStrategy Same strategy');
         require(amount != 0, 'SavingsAccount::switchStrategy Amount must be greater than zero');
 
@@ -250,9 +260,10 @@ contract SavingsAccount is ISavingsAccount, Initializable, OwnableUpgradeable {
         address token,
         address payable withdrawTo,
         uint256 amount
-    ) internal {
+    ) internal nonReentrant {
         if (token == address(0)) {
-            withdrawTo.transfer(amount);
+            (bool success, ) = withdrawTo.call{ value: amount }("");
+            require(success, "Transfer failed");
         } else {
             IERC20(token).safeTransfer(withdrawTo, amount);
         }
@@ -277,11 +288,7 @@ contract SavingsAccount is ISavingsAccount, Initializable, OwnableUpgradeable {
 
         if (tokenReceived == 0) return 0;
 
-        if (_asset == address(0)) {
-            msg.sender.transfer(tokenReceived);
-        } else {
-            IERC20(_asset).safeTransfer(msg.sender, tokenReceived);
-        }
+        _transfer(_asset, payable(msg.sender), tokenReceived);
 
         emit WithdrawnAll(msg.sender, tokenReceived, _asset);
     }
@@ -294,6 +301,28 @@ contract SavingsAccount is ISavingsAccount, Initializable, OwnableUpgradeable {
         allowance[msg.sender][token][to] = amount;
 
         emit Approved(token, msg.sender, to, amount);
+    }
+
+    function increaseAllowance(
+        address token,
+        address to,
+        uint256 amount
+    ) external override {
+        uint256 _updatedAllowance = allowance[msg.sender][token][to].add(amount);
+        allowance[msg.sender][token][to] = _updatedAllowance;
+
+        emit Approved(token, msg.sender, to, _updatedAllowance);
+    }
+
+    function decreaseAllowance(
+        address token,
+        address to,
+        uint256 amount
+    ) external override {
+        uint256 _updatedAllowance = allowance[msg.sender][token][to].sub(amount);
+        allowance[msg.sender][token][to] = _updatedAllowance;
+
+        emit Approved(token, msg.sender, to, _updatedAllowance);
     }
 
     function approveFromToCreditLine(

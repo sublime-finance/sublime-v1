@@ -159,8 +159,6 @@ describe('Pool', async () => {
             await poolFactory
                 .connect(admin)
                 .initialize(
-                    verification.address,
-                    strategyRegistry.address,
                     admin.address,
                     _collectionPeriod,
                     _matchCollateralRatioInterval,
@@ -170,14 +168,22 @@ describe('Pool', async () => {
                     _poolInitFuncSelector,
                     _poolTokenInitFuncSelector,
                     _liquidatorRewardFraction,
-                    priceOracle.address,
-                    savingsAccount.address,
-                    extenstion.address,
                     _poolCancelPenalityFraction
                 );
             poolImpl = await deployHelper.pool.deployPool();
             poolTokenImpl = await deployHelper.pool.deployPoolToken();
             repaymentImpl = await deployHelper.pool.deployRepayments();
+
+            await poolFactory.connect(admin).setImplementations(
+                poolImpl.address, 
+                repaymentImpl.address, 
+                poolTokenImpl.address,
+                verification.address,
+                strategyRegistry.address,
+                priceOracle.address,
+                savingsAccount.address,
+                extenstion.address
+            )
         });
 
         describe('Failed Cases', async () => {
@@ -244,7 +250,16 @@ describe('Pool', async () => {
             });
             it('Should revert if any other address other than owner tries to update implementation contracts', async () => {
                 await expect(
-                    poolFactory.connect(proxyAdmin).setImplementations(poolFactory.address, repaymentImpl.address, poolTokenImpl.address)
+                    poolFactory.connect(proxyAdmin).setImplementations(
+                        poolImpl.address, 
+                        repaymentImpl.address, 
+                        poolTokenImpl.address,
+                        verification.address,
+                        strategyRegistry.address,
+                        priceOracle.address,
+                        savingsAccount.address,
+                        extenstion.address
+                    )
                 ).to.be.revertedWith('Ownable: caller is not the owner');
             });
         });
@@ -267,7 +282,16 @@ describe('Pool', async () => {
 
             await poolFactory.connect(admin).updateSupportedCollateralTokens(Contracts.LINK, true);
 
-            await poolFactory.connect(admin).setImplementations(poolImpl.address, repaymentImpl.address, poolTokenImpl.address);
+            await poolFactory.connect(admin).setImplementations(
+                poolImpl.address, 
+                repaymentImpl.address, 
+                poolTokenImpl.address,
+                verification.address,
+                strategyRegistry.address,
+                priceOracle.address,
+                savingsAccount.address,
+                extenstion.address
+            );
 
             let deployHelper: DeployHelper = new DeployHelper(borrower);
             let collateralToken: ERC20 = await deployHelper.mock.getMockERC20(Contracts.LINK);
@@ -347,7 +371,16 @@ describe('Pool', async () => {
 
                 await poolFactory.connect(admin).updateSupportedCollateralTokens(Contracts.LINK, true);
 
-                await poolFactory.connect(admin).setImplementations(poolImpl.address, repaymentImpl.address, poolTokenImpl.address);
+                await poolFactory.connect(admin).setImplementations(
+                    poolImpl.address, 
+                    repaymentImpl.address, 
+                    poolTokenImpl.address,
+                    verification.address,
+                    strategyRegistry.address,
+                    priceOracle.address,
+                    savingsAccount.address,
+                    extenstion.address
+                );
 
                 let deployHelper: DeployHelper = new DeployHelper(borrower);
                 let collateralToken: ERC20 = await deployHelper.mock.getMockERC20(Contracts.LINK);
@@ -458,7 +491,16 @@ describe('Pool', async () => {
 
                 await poolFactory.connect(admin).updateSupportedCollateralTokens(Contracts.LINK, true);
 
-                await poolFactory.connect(admin).setImplementations(poolImpl.address, repaymentImpl.address, poolTokenImpl.address);
+                await poolFactory.connect(admin).setImplementations(
+                    poolImpl.address, 
+                    repaymentImpl.address, 
+                    poolTokenImpl.address,
+                    verification.address,
+                    strategyRegistry.address,
+                    priceOracle.address,
+                    savingsAccount.address,
+                    extenstion.address
+                );
 
                 let deployHelper: DeployHelper = new DeployHelper(borrower);
                 let collateralToken: ERC20 = await deployHelper.mock.getMockERC20(Contracts.LINK);

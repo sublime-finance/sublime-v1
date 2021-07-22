@@ -66,15 +66,51 @@ contract CreditLine is CreditLineStorage, ReentrancyGuard {
     event PartialCreditLineRepaid(bytes32 creditLineHash, uint256 repayAmount);
     event CreditLineClosed(bytes32 creditLineHash);
 
+    event DefaultStrategyUpdated(address defaultStrategy);
+    event PoolFactoryUpdated(address poolFactory);
+    event StrategyRegistryUpdated(address strategyRegistry);
+
     function initialize(
         address _defaultStrategy,
         address _poolFactory,
-        address _strategyRegistry
+        address _strategyRegistry,
+        address _owner
     ) public initializer {
-        __Ownable_init();
-        PoolFactory = _poolFactory;
-        strategyRegistry = _strategyRegistry;
+        OwnableUpgradeable.__Ownable_init();
+        OwnableUpgradeable.transferOwnership(_owner);
+        
+        _updateDefaultStrategy(_defaultStrategy);
+        _updatePoolFactory(_poolFactory);
+        _updateStrategyRegistry(_strategyRegistry);
+    }
+
+    function updateDefaultStrategy(address _defaultStrategy) public onlyOwner {
+        _updateDefaultStrategy(_defaultStrategy);
+    }
+
+    function _updateDefaultStrategy(address _defaultStrategy) internal {
         defaultStrategy = _defaultStrategy;
+        emit DefaultStrategyUpdated(_defaultStrategy);
+    }
+
+    function updatePoolFactory(address _poolFactory) public onlyOwner {
+        _updatePoolFactory(_poolFactory);
+    }
+
+    function _updatePoolFactory(address _poolFactory) internal {
+        require(_poolFactory != address(0), 'CL::I zero address');
+        PoolFactory = _poolFactory;
+        emit PoolFactoryUpdated(_poolFactory);
+    }
+
+    function updateStrategyRegistry(address _strategyRegistry) public onlyOwner {
+        _updateStrategyRegistry(_strategyRegistry);
+    }
+
+    function _updateStrategyRegistry(address _strategyRegistry) internal {
+        require(_strategyRegistry != address(0), 'CL::I zero address');
+        strategyRegistry = _strategyRegistry;
+        emit StrategyRegistryUpdated(_strategyRegistry);
     }
 
     /**
@@ -345,7 +381,7 @@ contract CreditLine is CreditLineStorage, ReentrancyGuard {
         uint256 _collateralAmount,
         bytes32 _creditLineHash,
         bool _fromSavingAccount
-    ) internal {
+    ) internal nonReentrant {
         if (_fromSavingAccount) {
             transferFromSavingAccount(_collateralAsset, _collateralAmount, msg.sender, address(this));
         } else {
@@ -456,7 +492,8 @@ contract CreditLine is CreditLineStorage, ReentrancyGuard {
         //transferFromSavingAccount(_borrowAsset,borrowAmount,_lender,address(this));
         _withdrawBorrowAmount(_borrowAsset, borrowAmount, _lender);
         if (_borrowAsset == address(0)) {
-            msg.sender.transfer(borrowAmount);
+            (bool success, ) = msg.sender.call{value: borrowAmount}("");
+            require(success, "Transfer fail");
         } else {
             IERC20(_borrowAsset).safeTransfer(msg.sender, borrowAmount);
         }
@@ -664,7 +701,7 @@ contract CreditLine is CreditLineStorage, ReentrancyGuard {
         revert('insufficient collateral');
     }
 
-    function liquidation(bytes32 creditLineHash) external payable {
+    function liquidation(bytes32 creditLineHash) external payable nonReentrant {
         require(
             creditLineInfo[creditLineHash].currentStatus == creditLineStatus.ACTIVE,
             'CreditLine: Credit line should be active.'

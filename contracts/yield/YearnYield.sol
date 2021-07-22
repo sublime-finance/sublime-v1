@@ -2,6 +2,7 @@
 pragma solidity 0.7.0;
 
 import '@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol';
+import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import '@openzeppelin/contracts/token/ERC20/SafeERC20.sol';
 import '@openzeppelin/contracts/math/SafeMath.sol';
 
@@ -13,7 +14,7 @@ import '../interfaces/Invest/IyVault.sol';
  * @notice Implements the functions to lock/unlock tokens into YVault
  * @author Sublime
  **/
-contract YearnYield is IYield, Initializable, OwnableUpgradeable {
+contract YearnYield is IYield, Initializable, OwnableUpgradeable, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
 
@@ -24,6 +25,8 @@ contract YearnYield is IYield, Initializable, OwnableUpgradeable {
      */
     mapping(address => address) public override liquidityToken;
 
+    event ProtocolAddressesUpdated(address asset, address protocolToken);
+
     modifier onlySavingsAccount {
         require(_msgSender() == savingsAccount, 'Invest: Only savings account can invoke');
         _;
@@ -33,28 +36,32 @@ contract YearnYield is IYield, Initializable, OwnableUpgradeable {
         __Ownable_init();
         super.transferOwnership(_owner);
 
-        require(_savingsAccount != address(0), 'Invest: zero address');
-        savingsAccount = _savingsAccount;
+        _updateSavingsAccount(_savingsAccount);
     }
 
-    function updateSavingsAccount(address payable _savingsAccount) external onlyOwner {
+    function updateSavingsAccount(address payable _savingsAccount) public onlyOwner {
+        _updateSavingsAccount(_savingsAccount);
+    }
+
+    function _updateSavingsAccount(address payable _savingsAccount) internal {
         require(_savingsAccount != address(0), 'Invest: zero address');
         savingsAccount = _savingsAccount;
+        emit SavingsAccountUpdated(_savingsAccount);
     }
 
     function updateProtocolAddresses(address asset, address to) external onlyOwner {
-        require(to != address(0), 'Invest: zero address');
-        require(liquidityToken[asset] == address(0), 'Invest: Cannot update existing address');
         liquidityToken[asset] = to;
+        emit ProtocolAddressesUpdated(asset, to);
     }
 
-    function emergencyWithdraw(address _asset, address payable _wallet) external onlyOwner returns (uint256 received) {
+    function emergencyWithdraw(address _asset, address payable _wallet) external onlyOwner nonReentrant returns (uint256 received) {
         address investedTo = liquidityToken[_asset];
         uint256 amount = IERC20(investedTo).balanceOf(address(this));
 
         if (_asset == address(0)) {
             received = _withdrawETH(investedTo, amount);
-            _wallet.transfer(received);
+            (bool success, ) = _wallet.call{ value: received }("");
+            require(success, "Transfer failed");
         } else {
             received = _withdrawERC(_asset, investedTo, amount);
             IERC20(_asset).safeTransfer(_wallet, received);
@@ -73,7 +80,7 @@ contract YearnYield is IYield, Initializable, OwnableUpgradeable {
         address user,
         address asset,
         uint256 amount
-    ) public payable override onlySavingsAccount returns (uint256 sharesReceived) {
+    ) public payable override onlySavingsAccount nonReentrant returns (uint256 sharesReceived) {
         require(amount != 0, 'Invest: amount');
 
         address investedTo = liquidityToken[asset];
@@ -94,13 +101,14 @@ contract YearnYield is IYield, Initializable, OwnableUpgradeable {
      * @param amount the amount of asset
      * @return received amount of tokens received
      **/
-    function unlockTokens(address asset, uint256 amount) public override onlySavingsAccount returns (uint256 received) {
+    function unlockTokens(address asset, uint256 amount) public override onlySavingsAccount nonReentrant returns (uint256 received) {
         require(amount != 0, 'Invest: amount');
         address investedTo = liquidityToken[asset];
 
         if (asset == address(0)) {
             received = _withdrawETH(investedTo, amount);
-            savingsAccount.transfer(received);
+            (bool success, ) = savingsAccount.call{ value: received }("");
+            require(success, "Transfer failed");
         } else {
             received = _withdrawERC(asset, investedTo, amount);
             IERC20(asset).safeTransfer(savingsAccount, received);
@@ -109,7 +117,7 @@ contract YearnYield is IYield, Initializable, OwnableUpgradeable {
         emit UnlockedTokens(asset, received);
     }
 
-    function unlockShares(address asset, uint256 amount) public override onlySavingsAccount returns (uint256) {
+    function unlockShares(address asset, uint256 amount) public override onlySavingsAccount nonReentrant returns (uint256) {
         if (amount == 0) {
             return 0;
         }

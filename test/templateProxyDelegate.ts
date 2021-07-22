@@ -222,8 +222,6 @@ describe('Template 2', async () => {
         await poolFactory
             .connect(admin)
             .initialize(
-                verification.address,
-                strategyRegistry.address,
                 admin.address,
                 _collectionPeriod,
                 _matchCollateralRatioInterval,
@@ -233,9 +231,6 @@ describe('Template 2', async () => {
                 _poolInitFuncSelector,
                 _poolTokenInitFuncSelector,
                 _liquidatorRewardFraction,
-                priceOracle.address,
-                savingsAccount.address,
-                extenstion.address,
                 _poolCancelPenalityFraction
             );
         console.log('Deploying pool logic');
@@ -250,7 +245,16 @@ describe('Template 2', async () => {
             await poolFactory.connect(admin).updateSupportedCollateralTokens(Contracts.LINK, true);
         }
 
-        await poolFactory.connect(admin).setImplementations(poolLogic.address, repaymentLogic.address, poolTokenLogic.address);
+        await poolFactory.connect(admin).setImplementations(
+            poolLogic.address, 
+            repaymentLogic.address, 
+            poolTokenLogic.address,
+            verification.address,
+            strategyRegistry.address,
+            priceOracle.address,
+            savingsAccount.address,
+            extenstion.address
+        );
 
         if (network.name === 'hardhat') {
             deployHelper = new DeployHelper(borrower);

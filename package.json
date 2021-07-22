@@ -54,7 +54,7 @@
     "dotenv": "^10.0.0",
     "ethereum-waffle": "^3.3.0",
     "ethereumjs-wallet": "^1.0.1",
-    "ethers": "^5.1.4",
+    "ethers": "^5.4.1",
     "hardhat": "^2.4.3",
     "hardhat-deploy": "^0.7.5",
     "hardhat-typechain": "^0.3.5",
