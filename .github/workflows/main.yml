@@ -1,0 +1,39 @@
+name: Compilation test
+
+on:
+    pull_request_review:
+        types: [submitted]
+    workflow_dispatch:
+
+jobs:
+    build:
+        if: github.event.review.state == 'approved' ||  github.event_name == 'workflow_dispatch'
+        name: Testing the contracts using foundry
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v2
+              with:
+                  submodules: recursive
+            # - uses: docker://cimg/rust:1.59-node
+            - name: Install dependencies
+              run: |
+                  npm install --save-dev
+            - name: Install Foundry
+              uses: onbjerg/foundry-toolchain@v1
+              with:
+                  version: nightly
+            - name: Build the contracts
+              run: forge build
+            - name: Run the tests using non forked state
+              run: FOUNDRY_FUZZ_RUNS=2000 forge test
+            - name: Run the tests using forked state
+              run: FOUNDRY_FUZZ_RUNS=1000 forge test --fork-url "https://eth-mainnet.alchemyapi.io/v2/${{ secrets.RITIK_ALCHEMY_KEY }}" --fork-block-number 14546456
+            - name: generating coverage
+              run: forge coverage --report lcov
+            - name: Upload coverage reports to Codecov with GitHub Action
+              uses: codecov/codecov-action@v3
+              with:
+                token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
+                files: ./lcov.info # optional
+                fail_ci_if_error: true # optional (default = false)
+                verbose: true # optional (default = false)
